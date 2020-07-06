@@ -1,0 +1,39 @@
+def go_mock(name:str, src_lib:str, package:str='', interfaces:list=[], deps:list, visibility:list=[]):
+    package = package if package else package_name()
+    interface_csv = ','.join(interfaces)
+
+    reflect_prog_src = build_rule(
+        name = name,
+        tag = 'reflect_prog_src',
+        outs = [f'_{name}_reflect_prog.go'],
+        cmd = f'$TOOL -prog_only {package} {interface_csv} > $OUT',
+        tools = ["mockgen"],
+        visibility = visibility,
+    )
+
+    reflect_prog = go_binary(
+        name = f'{name}#reflect_prog',
+        srcs = [reflect_prog_src],
+        filter_srcs=False,
+        deps = deps + [src_lib],
+        visibility = visibility,
+    )
+
+    src = build_rule(
+        name = name,
+        tag = "mock_srcs",
+        tools = {
+            'reflect': [reflect_prog],
+            'mockgen': ['mockgen'],
+        },
+        outs = [f'{name}_mock.go'],
+        cmd = f'$TOOLS_MOCKGEN -exec_only $TOOLS_REFLECT -destination $OUT {package} {interface_csv}',
+        visibility = visibility,
+    )
+
+    return go_library(
+        name = name,
+        srcs = [src],
+        deps = deps + [src_lib],
+        visibility = visibility,
+    )
